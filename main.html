@@ -2,11 +2,503 @@
 <html>
 	<head>
 		<title>Cell Web</title>
+
+		<style>
+			body {
+				font-family: sans-serif;
+				margin: 0px;
+			}
+			h2{
+				position: fixed;
+				margin: 0px;
+				margin-left: 20px;
+				padding: 0px;
+				height: 25px;
+			}
+			canvas{
+				width: 100%;
+				height: 100%;
+			}
+		</style>
+
 	</head>
 	
-	<body>
+	<body onresize="resize()" onmousemove="raton(event)">
+			<h2 id="area">area</h2>
+			<canvas id="canvas"></canvas>
+
+			<script>
+				var pix2 = 2*Math.PI;
+				var ANCHO;
+				var ALTO;
+				var centerX = 0;
+				var centerY = 0;
+				var canvas;
+				var ratonX = 0;
+				var ratonY = 0;
+				var x = 100;
+				var y = 400;
+				var r = 20;
+				var ctx;
+				var canvasCut = 10;
+				var comida = [];
+				var comidaLength = 300;
+				var zoom = 1;
+				var colis = [];
+				var velocidad = 100;
+				var radioMovimiento;
+				var areaTexto;
+
+				var engordarAnimacionIteracion = 0;
+				var engordarAnimacionIncremento = 0;
+				var engordarAnimacionFrames = 10;
+
+				var zoomAnimacionIteracion = 10;
+				var zoomIncremento = 0;
+
+				// DEBUG
+				var fecha;
+				var msInicio;
+
+				function iniciar(){
+
+					ANCHO = window.innerWidth - canvasCut;
+					ALTO  = window.innerHeight - canvasCut;
+					centerX = ANCHO / 2;
+					centerY = ALTO / 2;
+					canvas = document.getElementById("canvas");
+					canvas.height = ALTO;
+					canvas.width = ANCHO;
+					ctx = canvas.getContext('2d');
+					poblarMapaComidaSinOverlap();
+					x = 0;
+					y = 0;
+
+					document.body.onkeydown = function(e){
+						if(e.keyCode == 32){
+					    	soltarComida();
+						}
+					}
+
+					if(ALTO < ANCHO){
+						radioMovimiento = ALTO * 0.4;
+					}else{
+						radioMovimiento = ANCHO * 0.4;
+					}
+
+					areaTexto = document.getElementById("area");
+					areaTexto.innerHTML = "Area : Inicial";
+
+					//DEBUG
+					fecha = new Date();
+
+				}
+
+				function resize(){
+
+					ANCHO = window.innerWidth - canvasCut;
+					ALTO  = window.innerHeight - canvasCut;
+					centerX = ANCHO / 2;
+					centerY = ALTO / 2;
+					canvas.height = ALTO;
+					canvas.width = ANCHO;
+					x = 0;
+					y = 0;
+
+					if(ALTO < ANCHO){
+						radioMovimiento = ALTO * 0.4;
+					}else{
+						radioMovimiento = ANCHO * 0.4;
+					}
+
+				}
+
+				function poblarMapaComidaSinOverlap(){
+					var ncomida = Math.sqrt(comidaLength / 3);
+					for(var iy = 0; iy < ncomida; iy++){
+						for(var ix = 0; ix < ncomida; ix++){
+							var tx = (Math.random() * 200) + ix * 300;
+							var ty = (Math.random() * 200) + iy * 300;
+							var rand = Math.random();
+							if(rand < 0.18){
+								rand += 0.18;
+							}
+							var tr = rand * 100;
+							comida.push(tx);
+							comida.push(ty);
+							comida.push(tr);
+						}
+					}
+				}
+
+				function anadirComida(){
+					comida.push(Math.random() * 3000);
+					comida.push(Math.random() * 3000);
+					var rand = Math.random();
+					if(rand < 0.18){
+						rand += 0.18;
+					}
+					comida.push(rand * 100);
+					comidaLength +=3;
+				}
+
+				function poblarMapaComida(){
+
+					for(var i = 0; i < comidaLength; i+=3){
+						var tx;
+						var ty;
+						var tr;
+						do{
+							tx = Math.random() * 1000;
+							ty = Math.random() * 1000;
+							tr = Math.random() * 50;
+						}while(!comprobarOverlapComidaRapido(tx,ty,tr));
+
+						comida.push(tx);
+						comida.push(ty);
+						comida.push(tr);
+					}
+
+				}
+
+				function distanciaRapida(x1, y1, x2, y2){	// En diagonal sqrt(2) = 1.41421;
+
+					
+					var dx = Math.abs(x1 - x2);
+					var dy = Math.abs(y1 - y2);
+					return dx + dy;
+
+				}
+				function distancia(x1, y1, x2, y2){
+
+					var u1 = x2 - x1;
+					var u2 = y2 - y1;
+					return Math.sqrt((u1 * u1)+(u2 * u2));
+
+				}
+
+				function longitudVector(x, y){
+
+					return Math.sqrt((x*x)+(y*y));
+
+				}
 
 
+				function colisiones(){
+
+					colis = [];
+					for(var i = 0; i < comidaLength; i+=3){
+						if(r < comida[i+2]){
+							var sumaradios = r + comida[i+2];
+							if(distanciaRapida(x,y,comida[i], comida[i+1]) < sumaradios * 1.45){
+								
+								var vecXo = comida[i] - x;
+								var vecYo = comida[i+1] -y;
+
+								var vecX = vecXo;
+								var vecY = vecYo;
+
+								var len = longitudVector(vecX, vecY);
+
+								if(len < sumaradios){
+									vecX = vecX / len;
+									vecY = vecY / len;
+
+									vecX = vecX * sumaradios;
+									vecY = vecY * sumaradios;
+
+									var incX = vecX - vecXo;
+									var incY = vecY - vecYo;
+
+									comida[i]   += incX;
+									comida[i+1] += incY;
+
+									colis.push(i);
+								}
+							}
+							
+						}
+					}
+
+					//console.log("colisiones = " + colis.length);
+				}
+
+				function enColis(i){
+
+					for(var e = 0; e < colis.length; e++){
+						if(i == colis[e]){
+							return 1;
+						}
+					}
+					return 0;
+				}
+
+				function colisionesDeColisiones(){
+
+					for(var c = 0; c < colis.length; c++){
+						var cx = comida[colis[c]+0];
+						var cy = comida[colis[c]+1];
+						var cr = comida[colis[c]+2];
+						for(var i = 0; i < comidaLength; i+=3){
+							if(!enColis(i)){
+								var sumaR = cr + comida[i+2];
+								if(distanciaRapida(cx, cy, comida[i], comida[i+1]) < sumaR * 1.45){
+									var vecXo = comida[i]  -  cx;
+									var vecYo = comida[i+1] - cy;
+
+									var vecX = vecXo;
+									var vecY = vecYo;
+
+									var len = longitudVector(vecX, vecY);
+
+									if(len < sumaR){
+										vecX = vecX / len;
+										vecY = vecY / len;
+
+										vecX = vecX * sumaR;
+										vecY = vecY * sumaR;
+
+										var incX = vecX - vecXo;
+										var incY = vecY - vecYo;
+
+										comida[i]   += incX;
+										comida[i+1] += incY;
+										colis.push(i);
+									}
+								}
+							}
+						}
+					}
+					//console.log("colisiones = " + colis.length);
+				}
+
+				function velocidadSegunColisiones(){
+					velocidad = 80 + r;
+					for(var i = 0; i < colis.length; i++){
+						velocidad += comida[colis[i]+2] * 1.5;
+					}
+				}
+
+				function comerCirculo(c1x, c1y, c1r, c2x, c2y, c2r){
+
+					if(c1r > c2r){
+						var dist = distancia(c1x, c1y, c2x, c2y);
+						if(dist <= Math.abs(c1r - c2r)){
+							anadirComida();
+							return 1;
+						}
+					}
+					return 0;
+
+				}
+
+				function engordarAnimacion(){
+				
+					if(engordarAnimacionIteracion < engordarAnimacionFrames){
+						r += engordarAnimacionIncremento;
+						engordarAnimacionIteracion++;
+					}
+				
+				}
+
+				function engordarAnimacionIniciar(Robjetivo){
+
+					engordarAnimacionIncremento = (Robjetivo - r) / engordarAnimacionFrames;
+					engordarAnimacionIteracion = 0; 
+				
+				}
+
+				function engordar(radio){
+
+					var comidaArea = Math.PI * radio * radio;
+					var userArea = Math.PI * r * r;
+					if(radio < 0){
+						var resultArea = userArea - comidaArea;
+					}
+					else{
+						var resultArea = userArea + comidaArea;
+					}
+					engordarAnimacionIniciar(Math.sqrt(resultArea / Math.PI));
+					
+					velocidad = 80 + r;
+
+					ZoomAnimacionIniciar();
+
+					areaTexto.innerHTML = "Area : " + Math.floor(resultArea);
+
+					if(r < 10){
+						window.alert("ESTAS MUERTO! :O");
+					}
+
+					//console.log("vel = " + velocidad);
+				}
+
+				function comer(){
+
+					for(var i = 0; i < comidaLength; i+=3){
+						if(comerCirculo(x,y,r,comida[i],comida[i+1], comida[i+2])){
+							//console.log("Comido = " + comida[i+2]);
+							engordar(comida[i+2]);
+							comida.splice(i,3);
+							comidaLength -= 3;
+							//console.log(r);
+
+						}
+					}
+					
+				}
+
+				function ZoomAnimacion(){
+					if(zoomAnimacionIteracion < 10){
+						zoom += zoomIncremento;
+						zoomAnimacionIteracion++;
+					}
+				}
+
+				function ZoomAnimacionIniciar(){
+					if(r > 200){
+						zoomAnimacionIteracion = 0;
+						var zoomObjetivo = 1 + (r - 200)/100;
+						zoomIncremento = (zoomObjetivo - zoom) / 10;
+					}
+				}
+
+				function renderCirculo(x, y, r){
+
+					ctx.beginPath();
+					ctx.arc((x/zoom) + centerX,(y/zoom) + centerY,r/zoom,0,pix2);
+					ctx.closePath();
+					ctx.fill();
+
+				}
+
+
+				function clear(){
+
+					ctx.clearRect(0, 0, canvas.width, canvas.height);
+
+				}
+
+				function renderComida(){
+
+					for(var i = 0; i < comidaLength; i+=3){
+						renderCirculo(comida[i], comida[i+1], comida[i+2]);
+					}
+
+				}
+
+				function renderCrosshair(){
+
+					ctx.beginPath();
+					ctx.moveTo(centerX - 10, centerY);
+					ctx.lineTo(centerX + 10, centerY);
+					ctx.moveTo(centerX, centerY - 10);
+					ctx.lineTo(centerX, centerY + 10);
+					ctx.closePath();
+					ctx.stroke();
+
+				}
+
+				function raton(e){
+
+					ratonX = e.clientX;
+					ratonY = e.clientY;
+
+				}
+
+				function mundoMover(x, y){
+					for(var i = 0; i < comidaLength; i+=3){
+						comida[i]   += x;
+						comida[i+1] += y;
+					}
+				}
+
+				function soltarComida(){
+					engordar(-10);
+					comida.push((ratonX*zoom)-centerX);
+					comida.push((ratonY*zoom)-centerY);
+					comida.push(10);
+					comidaLength += 3;
+
+				}
+
+				function renderCirculoMovimiento(){
+					renderCirculo(x, y, radioMovimiento*zoom);
+				}
+
+				function ratonMover(){
+
+					var incX = (centerX - ratonX);
+					var incY = (centerY - ratonY);
+					var len = longitudVector(incX, incY);
+					if(len < radioMovimiento * 0.1){
+						return;	
+					}
+					if(radioMovimiento < len){
+						incX = incX / len;
+						incY = incY / len;
+						incX = incX * radioMovimiento;
+						incY = incY * radioMovimiento;
+					}
+					
+
+					incX /= velocidad;
+					incY /= velocidad;
+					mundoMover(incX, incY);
+					
+					
+
+					console.log("x:"+x);
+					console.log("y:"+y);
+
+				}
+
+				function render(){
+
+					clear();
+					ctx.fillStyle = '#EEE';
+					renderCirculoMovimiento();
+					ctx.fillStyle = 'green';
+					renderComida();
+					ctx.fillStyle = 'blue';
+					renderCirculo(x, y, r);
+					renderCrosshair();
+
+				}
+
+				function bucleJuego(){
+
+					msInicio = fecha.getTime();
+
+					// JUEGO
+					ratonMover();
+					comer();
+					colisiones();
+					colisionesDeColisiones();
+					velocidadSegunColisiones();
+					ZoomAnimacion();
+					engordarAnimacion();
+					// RENDER
+					render();
+
+					var tiempo = fecha.getTime() - msInicio;
+					console.log("t:"+tiempo);
+
+					window.requestAnimationFrame(
+						function(){
+							bucleJuego();
+						}
+					);
+					
+				}
+
+				//////////////////////////////////////MAIN//////////////////////
+
+				iniciar();
+				bucleJuego();
+
+
+			</script>
 
 	</body>
 </html>
