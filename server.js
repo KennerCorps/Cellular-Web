@@ -1,8 +1,19 @@
-var io = require('socket.io')(80);
-var cfg = require('./config.json');
-var tw = require('node-tweet-stream')(cfg);
-tw.track('socket.io');
-tw.track('javascript');
-tw.on('tweet', function(tweet){
-  io.emit('tweet', tweet);
+var app = require('express')();
+var http = require('http').Server(app);
+var io = require('socket.io')(http);
+
+app.get('/', function(req, res){
+  res.sendFile(__dirname + '/main.html');
+});
+
+http.listen(3000, function(){
+  console.log('listening on *:3000');
+});
+
+io.on('connection', function(socket){
+  console.log('a user connected');
+});
+
+http.listen(3000, function(){
+  console.log('listening on *:3000');
 });
