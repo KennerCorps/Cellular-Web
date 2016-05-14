@@ -27,7 +27,12 @@
 			<h2 id="area">area</h2>
 			<canvas id="canvas"></canvas>
 
+			<script src="/socket.io/socket.io.js"></script>
+		    <script src="http://code.jquery.com/jquery-1.11.1.js"></script>
+
 			<script>
+				var socket;
+				
 				var pix2 = 2*Math.PI;
 				var ANCHO;
 				var ALTO;
@@ -38,6 +43,8 @@
 				var ratonY = 0;
 				var x = 100;
 				var y = 400;
+				var xJugador = 0;
+				var yJugador = 0;
 				var r = 20;
 				var ctx;
 				var canvasCut = 10;
@@ -48,6 +55,9 @@
 				var velocidad = 100;
 				var radioMovimiento;
 				var areaTexto;
+				var ID = 0;
+
+				var otrosJugadores = [];
 
 				var engordarAnimacionIteracion = 0;
 				var engordarAnimacionIncremento = 0;
@@ -324,6 +334,8 @@
 
 					ZoomAnimacionIniciar();
 
+					enviarPosicion();
+
 					areaTexto.innerHTML = "Area : " + Math.floor(resultArea);
 
 					if(r < 10){
@@ -411,6 +423,8 @@
 						comida[i]   += x;
 						comida[i+1] += y;
 					}
+					xJugador -= x;
+					yJugador -= y;
 				}
 
 				function soltarComida(){
@@ -448,8 +462,8 @@
 					
 					
 
-					console.log("x:"+x);
-					console.log("y:"+y);
+					//console.log("x:"+x);
+					//console.log("y:"+y);
 
 				}
 
@@ -466,9 +480,16 @@
 
 				}
 
+				function renderOtrosPlayers(){
+					ctx.fillStyle = '#F00';
+					for(var i = 0; i < otrosJugadores.length; i++){
+						renderCirculo(otrosJugadores[1] - xJugador, otrosJugadores[2] - yJugador, otrosJugadores[3]);
+					}
+				}
+
 				function bucleJuego(){
 
-					msInicio = fecha.getTime();
+					//msInicio = fecha.getTime();
 
 					// JUEGO
 					ratonMover();
@@ -478,11 +499,13 @@
 					velocidadSegunColisiones();
 					ZoomAnimacion();
 					engordarAnimacion();
+					enviarPosicion();
 					// RENDER
 					render();
+					renderOtrosPlayers();
 
-					var tiempo = fecha.getTime() - msInicio;
-					console.log("t:"+tiempo);
+					//var tiempo = fecha.getTime() - msInicio;
+					//console.log("t:"+tiempo);
 
 					window.requestAnimationFrame(
 						function(){
@@ -492,10 +515,49 @@
 					
 				}
 
+				function enviarPosicion(){
+					socket.emit('pos', ID + "," + xJugador + "," + yJugador + "," + r);
+				}
+
+
+				$(document).ready(function(){
+					socket = io();
+
+					iniciar();
+					bucleJuego();
+
+					socket.emit('new');
+
+					socket.on('new', function(id){
+						ID = id;
+						console.log("ID = " + ID);
+					});
+
+					socket.on('add', function(id){
+						var diferencia = id - otrosJugadores.length;
+						for(var i = 0; i < diferencia*4; i++){
+							otrosJugadores.push(0);
+						}
+
+					})
+
+					socket.on('pos', function(msg){
+						var arrayXYR = msg.split(',');
+
+						otrosJugadores[(arrayXYR[0]*4)+0] = arrayXYR[0];
+						otrosJugadores[(arrayXYR[0]*4)+1] = arrayXYR[1];
+						otrosJugadores[(arrayXYR[0]*4)+2] = arrayXYR[2];
+						otrosJugadores[(arrayXYR[0]*4)+3] = arrayXYR[3];
+						
+						console.log("jugador("+ arrayXYR[0]+") = " + arrayXYR[1] + "," + arrayXYR[2]);
+					});
+				});
+
+				
+
 				//////////////////////////////////////MAIN//////////////////////
 
-				iniciar();
-				bucleJuego();
+				
 
 
 			</script>
